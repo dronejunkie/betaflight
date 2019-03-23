@@ -34,6 +34,9 @@ typedef struct rpmFilterConfig_s
     uint16_t dterm_rpm_notch_q;          // q of the notches
 
     uint16_t rpm_lpf;                    // the cutoff of the lpf on reported motor rpm
+    uint16_t rpm_notch_min_cutoff_pc;           // prefilter cutoff
+    uint16_t rpm_q_scale_cutoff;
+    uint8_t  rpm_q_scale;
 } rpmFilterConfig_t;
 
 PG_DECLARE(rpmFilterConfig_t, rpmFilterConfig);

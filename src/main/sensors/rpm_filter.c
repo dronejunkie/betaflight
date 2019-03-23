@@ -62,8 +62,12 @@ FAST_RAM_ZERO_INIT static float   pidLooptime;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t filters[2];
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* gyroFilter;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* dtermFilter;
+FAST_RAM_ZERO_INIT static float  notch_min_cutoff_pc;
+FAST_RAM_ZERO_INIT static uint8_t q_scale;
+FAST_RAM_ZERO_INIT static float q_scale_cutoff;
 
-PG_REGISTER_WITH_RESET_FN(rpmFilterConfig_t, rpmFilterConfig, PG_RPM_FILTER_CONFIG, 3);
+
+PG_REGISTER_WITH_RESET_FN(rpmFilterConfig_t, rpmFilterConfig, PG_RPM_FILTER_CONFIG, 4);
 
 void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
 {
@@ -76,6 +80,9 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->dterm_rpm_notch_q = 500;
 
     config->rpm_lpf = 150;
+    config->rpm_notch_min_cutoff_pc = 50;
+    config->rpm_q_scale = 20;
+    config->rpm_q_scale_cutoff = 200;
 }
 
 static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, int q, float looptime)
@@ -129,6 +136,10 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     numberFilters = getMotorCount() * (filters[0].harmonics + filters[1].harmonics);
     const float filtersPerLoopIteration = numberFilters / loopIterationsPerUpdate;
     filterUpdatesPerIteration = rintf(filtersPerLoopIteration + 0.49f);
+    q_scale = config->rpm_q_scale;
+    q_scale_cutoff = config->rpm_q_scale_cutoff;
+    notch_min_cutoff_pc=config->rpm_notch_min_cutoff_pc/100.0f;
+
 }
 
 static float applyFilter(rpmNotchFilter_t* filter, int axis, float value)
@@ -166,25 +177,60 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     FAST_RAM_ZERO_INIT static uint8_t harmonic;
     FAST_RAM_ZERO_INIT static uint8_t filter;
     FAST_RAM static rpmNotchFilter_t* currentFilter = &filters[0];
+    FAST_RAM static uint8_t hop;
+
 
     for (int motor = 0; motor < getMotorCount(); motor++) {
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
+        /*
         if (motor < 4) {
             DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
-        }
+        } */
     }
 
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
-        float frequency = constrainf(
-            (harmonic + 1) * motorFrequency[motor], currentFilter->minHz, currentFilter->maxHz);
+
+        float frequency = (harmonic + hop + 1) * motorFrequency[motor];
+        if (frequency < currentFilter->minHz) {
+            if (frequency < notch_min_cutoff_pc  * currentFilter->minHz) {
+                frequency = currentFilter->minHz; 
+            } else {
+                //frequency = currentFilter->minHz;
+                hop=ceilf(currentFilter->minHz/(float) motorFrequency[motor]);
+                frequency = (hop--) * motorFrequency[motor];
+            }
+        }
+
+        frequency = constrainf(frequency, currentFilter->minHz, currentFilter->maxHz);
+
         biquadFilter_t* template = &currentFilter->notch[0][motor][harmonic];
+
+        int q = currentFilter->q;
+        if ( frequency < q_scale_cutoff ) {
+            q = q / q_scale;
+        }
+
+        if ( harmonic == 1 ) {
+            q = q * 0.8f;
+        }
+
+        if ( harmonic == 2 ) {
+            q = q * 0.7f;
+        }
+
+        if ( motor == 0 ) {
+            DEBUG_SET(DEBUG_RPM_FILTER, 0, q); 
+            DEBUG_SET(DEBUG_RPM_FILTER, 1, harmonic); 
+            DEBUG_SET(DEBUG_RPM_FILTER, 2, q_scale_cutoff); 
+            DEBUG_SET(DEBUG_RPM_FILTER, 3, frequency) 
+        }
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
         /* DEBUG_SET(DEBUG_RPM_FILTER, 0, harmonic); */
         /* DEBUG_SET(DEBUG_RPM_FILTER, 1, motor); */
         /* DEBUG_SET(DEBUG_RPM_FILTER, 2, currentFilter == &gyroFilter); */
         /* DEBUG_SET(DEBUG_RPM_FILTER, 3, frequency) */
         biquadFilterUpdate(
-            template, frequency, currentFilter->loopTime, currentFilter->q, FILTER_NOTCH);
+            template, frequency, currentFilter->loopTime, q, FILTER_NOTCH);
         for (int axis = 1; axis < XYZ_AXIS_COUNT; axis++) {
             biquadFilter_t* clone = &currentFilter->notch[axis][motor][harmonic];
             clone->b0 = template->b0;
