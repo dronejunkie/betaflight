@@ -62,12 +62,12 @@ FAST_RAM_ZERO_INIT static float   pidLooptime;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t filters[2];
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* gyroFilter;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* dtermFilter;
-FAST_RAM_ZERO_INIT static float  notch_min_cutoff_pc;
-FAST_RAM_ZERO_INIT static uint8_t q_scale;
-FAST_RAM_ZERO_INIT static float q_scale_cutoff;
+static float  notch_min_cutoff_pc;
+static float q_scale;
+static float q_scale_cutoff;
 
 
-PG_REGISTER_WITH_RESET_FN(rpmFilterConfig_t, rpmFilterConfig, PG_RPM_FILTER_CONFIG, 4);
+PG_REGISTER_WITH_RESET_FN(rpmFilterConfig_t, rpmFilterConfig, PG_RPM_FILTER_CONFIG, 3);
 
 void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
 {
@@ -136,7 +136,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     numberFilters = getMotorCount() * (filters[0].harmonics + filters[1].harmonics);
     const float filtersPerLoopIteration = numberFilters / loopIterationsPerUpdate;
     filterUpdatesPerIteration = rintf(filtersPerLoopIteration + 0.49f);
-    q_scale = config->rpm_q_scale;
+    q_scale = config->rpm_q_scale / 10.0f;
     q_scale_cutoff = config->rpm_q_scale_cutoff;
     notch_min_cutoff_pc=config->rpm_notch_min_cutoff_pc/100.0f;
 
@@ -205,22 +205,21 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
         biquadFilter_t* template = &currentFilter->notch[0][motor][harmonic];
 
-        int q = currentFilter->q;
+        float q = currentFilter->q;
         if ( frequency < q_scale_cutoff ) {
             q = q / q_scale;
         }
-
         if ( harmonic == 1 ) {
-            q = q * 0.8f;
+            q = 3.0f;
         }
 
         if ( harmonic == 2 ) {
-            q = q * 0.7f;
+            q = 2.5f;
         }
 
-        if ( motor == 0 ) {
-            DEBUG_SET(DEBUG_RPM_FILTER, 0, q); 
-            DEBUG_SET(DEBUG_RPM_FILTER, 1, harmonic); 
+        if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
+            DEBUG_SET(DEBUG_RPM_FILTER, 0, q_scale); 
+            DEBUG_SET(DEBUG_RPM_FILTER, 1, q * 100); 
             DEBUG_SET(DEBUG_RPM_FILTER, 2, q_scale_cutoff); 
             DEBUG_SET(DEBUG_RPM_FILTER, 3, frequency) 
         }
@@ -242,6 +241,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
         if (++harmonic == currentFilter->harmonics) {
             harmonic = 0;
+            hop = 0;
             if (++filter == numberRpmNotchFilters) {
                 filter = 0;
                 if (++motor == getMotorCount()) {

@@ -1411,7 +1411,7 @@ const clivalue_t valueTable[] = {
     { "rpm_notch_lpf",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 100, 500 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_lpf) },
     { "rpm_notch_min_cutoff_pc",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t,rpm_notch_min_cutoff_pc) },
      { "rpm_q_scale_cutoff",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 50, 600 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_q_scale_cutoff) },
-    { "rpm_q_scale",  VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 1, 100 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_q_scale) },
+    { "rpm_q_scale",  VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 10, 100 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_q_scale) },
 #endif
 
 #ifdef USE_RX_FLYSKY
