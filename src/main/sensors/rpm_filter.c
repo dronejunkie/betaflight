@@ -80,7 +80,7 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->dterm_rpm_notch_q = 500;
 
     config->rpm_lpf = 150;
-    config->rpm_notch_min_cutoff_pc = 50;
+    config->rpm_notch_min_cutoff_pc = 70;
     config->rpm_q_scale = 20;
     config->rpm_q_scale_cutoff = 200;
 }
@@ -191,24 +191,26 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
 
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
-        if (frequency < currentFilter->minHz) {
-            if (frequency < notch_min_cutoff_pc  * currentFilter->minHz) {
-                frequency = currentFilter->minHz; 
-            } else {
-                //frequency = currentFilter->minHz;
-                hop=ceilf(currentFilter->minHz/(float) motorFrequency[motor]);
-                frequency = (hop--) * motorFrequency[motor];
-            }
-        }
+        float q = currentFilter->q;
+        // Look for the next harmonic.
+		if (frequency < notch_min_cutoff_pc  * currentFilter->minHz) {
+			hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
+			frequency = (hop--) * motorFrequency[motor];
+		}
 
-        frequency = constrainf(frequency, currentFilter->minHz, currentFilter->maxHz);
+        frequency = constrainf(frequency, currentFilter->minHz * notch_min_cutoff_pc , currentFilter->maxHz);
 
         biquadFilter_t* template = &currentFilter->notch[0][motor][harmonic];
 
-        float q = currentFilter->q;
-        if ( frequency < q_scale_cutoff ) {
+
+        /*if ( frequency < q_scale_cutoff ) {
             q = q / q_scale;
+        }*/
+
+        if ( frequency < currentFilter -> minHz) {
+        	q = 10.0f;
         }
+
         if ( harmonic == 1 ) {
             q = 3.0f;
         }
@@ -218,9 +220,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         }
 
         if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
-            DEBUG_SET(DEBUG_RPM_FILTER, 0, q_scale); 
+            DEBUG_SET(DEBUG_RPM_FILTER, 0, (int) currentFilter->minHz * notch_min_cutoff_pc);
             DEBUG_SET(DEBUG_RPM_FILTER, 1, q * 100); 
-            DEBUG_SET(DEBUG_RPM_FILTER, 2, q_scale_cutoff); 
+            DEBUG_SET(DEBUG_RPM_FILTER, 2, currentFilter -> minHz);
             DEBUG_SET(DEBUG_RPM_FILTER, 3, frequency) 
         }
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
