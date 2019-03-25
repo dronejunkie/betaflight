@@ -18,7 +18,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <math.h>
 #include <stdint.h>
 #include "platform.h"
@@ -193,9 +192,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
         float q = currentFilter->q;
         // Look for the next harmonic.
-		if (frequency < notch_min_cutoff_pc  * currentFilter->minHz) {
-			hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
-			frequency = (hop--) * motorFrequency[motor];
+		if (frequency < notch_min_cutoff_pc * currentFilter->minHz) {
+		    hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
+		    frequency = (hop--) * motorFrequency[motor];
 		}
 
         frequency = constrainf(frequency, currentFilter->minHz * notch_min_cutoff_pc , currentFilter->maxHz);
@@ -208,7 +207,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         }*/
 
         if ( frequency < currentFilter -> minHz) {
-        	q = 10.0f;
+            q = 10.0f;
+        } else if ( frequency < q_scale_cutoff ) {
+            q = q / q_scale;
         }
 
         if ( harmonic == 1 ) {
@@ -225,6 +226,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
             DEBUG_SET(DEBUG_RPM_FILTER, 2, currentFilter -> minHz);
             DEBUG_SET(DEBUG_RPM_FILTER, 3, frequency) 
         }
+
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
         /* DEBUG_SET(DEBUG_RPM_FILTER, 0, harmonic); */
         /* DEBUG_SET(DEBUG_RPM_FILTER, 1, motor); */
