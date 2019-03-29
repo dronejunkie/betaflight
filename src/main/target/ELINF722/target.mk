@@ -1,12 +1,6 @@
-F405_TARGETS   += $(TARGET)
-ifeq ($(TARGET), AIRBOTF4SD)
-FEATURES       = VCP SDCARD_SPI
-else
+F7X2RE_TARGETS += $(TARGET) 
 FEATURES       = VCP ONBOARDFLASH
-endif
-
 TARGET_SRC = \
-            drivers/accgyro/accgyro_spi_mpu6000.c \
             drivers/accgyro/accgyro_mpu6500.c \
             drivers/accgyro/accgyro_spi_mpu6500.c \
             drivers/barometer/barometer_ms5611.c \
