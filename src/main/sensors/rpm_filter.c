@@ -46,7 +46,7 @@ typedef struct rpmNotchFilter_s
     uint8_t harmonics;
     float   minHz;
     float   maxHz;
-    float   q;
+    float   q[3];
     float   loopTime;
 
     biquadFilter_t notch[XYZ_AXIS_COUNT][MAX_SUPPORTED_MOTORS][RPM_FILTER_MAXHARMONICS];
@@ -66,6 +66,7 @@ static float q_scale;
 static float q_scale_cutoff;
 
 
+
 PG_REGISTER_WITH_RESET_FN(rpmFilterConfig_t, rpmFilterConfig, PG_RPM_FILTER_CONFIG, 3);
 
 void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
@@ -73,29 +74,35 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->gyro_rpm_notch_harmonics = 3;
     config->gyro_rpm_notch_min = 100;
     config->gyro_rpm_notch_q = 500;
+    config->gyro_rpm_notch_q1 = 600;
+    config->gyro_rpm_notch_q2 = 600;
 
     config->dterm_rpm_notch_harmonics = 0;
     config->dterm_rpm_notch_min = 100;
     config->dterm_rpm_notch_q = 500;
+    config->dterm_rpm_notch_q1 = 600;
+    config->dterm_rpm_notch_q2 = 600;
 
     config->rpm_lpf = 150;
-    config->rpm_notch_min_cutoff_pc = 70;
-    config->rpm_q_scale = 20;
+    config->rpm_notch_min_cutoff_pc = 100;
+    config->rpm_q_scale = 10;
     config->rpm_q_scale_cutoff = 200;
 }
 
-static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, int q, float looptime)
+static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, const float q[], float looptime)
 {
     filter->harmonics = harmonics;
     filter->minHz = minHz;
-    filter->q = q / 100.0f;
+    filter->q[0] = q[0] / 100.0f;
+    filter->q[1] = q[1] / 100.0f;
+    filter->q[2] = q[2] / 100.0f;
     filter->loopTime = looptime;
 
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
         for (int motor = 0; motor < getMotorCount(); motor++) {
             for (int i = 0; i < harmonics; i++) {
                 biquadFilterInit(
-                    &filter->notch[axis][motor][i], minHz * i, looptime, filter->q, FILTER_NOTCH);
+                    &filter->notch[axis][motor][i], minHz * i, looptime, filter->q[i], FILTER_NOTCH);
             }
         }
     }
@@ -112,15 +119,23 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     pidLooptime = gyro.targetLooptime * pidConfig()->pid_process_denom;
     if (config->gyro_rpm_notch_harmonics) {
         gyroFilter = &filters[numberRpmNotchFilters++];
+        float gyro_notch_q[3];
+        gyro_notch_q[0] = config->gyro_rpm_notch_q;
+        gyro_notch_q[1] = config->gyro_rpm_notch_q1;
+        gyro_notch_q[2] = config->gyro_rpm_notch_q2;
         rpmNotchFilterInit(gyroFilter, config->gyro_rpm_notch_harmonics,
-                           config->gyro_rpm_notch_min, config->gyro_rpm_notch_q, gyro.targetLooptime);
+                           config->gyro_rpm_notch_min, gyro_notch_q, gyro.targetLooptime);
         // don't go quite to nyquist to avoid oscillations
         gyroFilter->maxHz = 0.48f / (gyro.targetLooptime * 1e-6f);
     }
     if (config->dterm_rpm_notch_harmonics) {
         dtermFilter = &filters[numberRpmNotchFilters++];
+        float dterm_notch_q[3];
+        dterm_notch_q[0] = config->dterm_rpm_notch_q;
+        dterm_notch_q[1] = config->dterm_rpm_notch_q1;
+        dterm_notch_q[2] = config->dterm_rpm_notch_q2;
         rpmNotchFilterInit(dtermFilter, config->dterm_rpm_notch_harmonics,
-                           config->dterm_rpm_notch_min, config->dterm_rpm_notch_q, pidLooptime);
+                           config->dterm_rpm_notch_min, dterm_notch_q, pidLooptime);
         // don't go quite to nyquist to avoid oscillations
         dtermFilter->maxHz = 0.48f / (pidLooptime * 1e-6f);
     }
@@ -190,7 +205,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
 
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
-        float q = currentFilter->q;
+        float q = currentFilter->q[harmonic];
         // Look for the next harmonic.
 		if (frequency < notch_min_cutoff_pc * currentFilter->minHz) {
 		    hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
@@ -202,29 +217,25 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         biquadFilter_t* template = &currentFilter->notch[0][motor][harmonic];
 
 
-        /*if ( frequency < q_scale_cutoff ) {
-            q = q / q_scale;
-        }*/
-
         if ( frequency < currentFilter -> minHz) {
             q = 10.0f;
         } else if ( frequency < q_scale_cutoff ) {
             q = q / q_scale;
         }
 
-        if ( harmonic == 1 ) {
-            q = 3.0f;
-        }
-
-        if ( harmonic == 2 ) {
-            q = 2.5f;
-        }
+//        if ( harmonic == 1 ) {
+//            q = 3.0f;
+//        }
+//
+//        if ( harmonic == 2 ) {
+//            q = 2.5f;
+//        }
 
         if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
-            DEBUG_SET(DEBUG_RPM_FILTER, 0, (int) currentFilter->minHz * notch_min_cutoff_pc);
-            DEBUG_SET(DEBUG_RPM_FILTER, 1, q * 100); 
-            DEBUG_SET(DEBUG_RPM_FILTER, 2, currentFilter -> minHz);
-            DEBUG_SET(DEBUG_RPM_FILTER, 3, frequency) 
+            DEBUG_SET(DEBUG_RPM_FILTER, 0, frequency);
+            DEBUG_SET(DEBUG_RPM_FILTER, 1, currentFilter->q[0] * 100);
+            DEBUG_SET(DEBUG_RPM_FILTER, 2, currentFilter->q[1] * 100);
+            DEBUG_SET(DEBUG_RPM_FILTER, 3, currentFilter->q[2] * 100)
         }
 
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above

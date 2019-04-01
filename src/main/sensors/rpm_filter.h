@@ -28,10 +28,14 @@ typedef struct rpmFilterConfig_s
     uint8_t  gyro_rpm_notch_harmonics;   // how many harmonics should be covered with notches? 0 means filter off
     uint8_t  gyro_rpm_notch_min;         // minimum frequency of the notches
     uint16_t gyro_rpm_notch_q;           // q of the notches
+    uint16_t gyro_rpm_notch_q1;           // q of the notches
+    uint16_t gyro_rpm_notch_q2;           // q of the notches
 
     uint8_t  dterm_rpm_notch_harmonics;  // how many harmonics should be covered with notches? 0 means filter off
     uint8_t  dterm_rpm_notch_min;        // minimum frequency of the notches
     uint16_t dterm_rpm_notch_q;          // q of the notches
+    uint16_t dterm_rpm_notch_q1;          // q of the notches
+    uint16_t dterm_rpm_notch_q2;          // q of the notches
 
     uint16_t rpm_lpf;                    // the cutoff of the lpf on reported motor rpm
     uint16_t rpm_notch_min_cutoff_pc;           // prefilter cutoff
