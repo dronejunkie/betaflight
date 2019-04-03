@@ -41,6 +41,7 @@ typedef struct rpmFilterConfig_s
     uint16_t rpm_notch_min_cutoff_pc;           // prefilter cutoff
     uint16_t rpm_q_scale_cutoff;
     uint8_t  rpm_q_scale;
+    uint16_t rpm_gyro_lpf;
 } rpmFilterConfig_t;
 
 PG_DECLARE(rpmFilterConfig_t, rpmFilterConfig);

@@ -40,7 +40,7 @@
 #if defined(USE_RPM_FILTER)
 
 static pt1Filter_t rpmFilters[MAX_SUPPORTED_MOTORS];
-
+static pt1Filter_t rpmGyroLPF[XYZ_AXIS_COUNT];
 typedef struct rpmNotchFilter_s
 {
     uint8_t harmonics;
@@ -61,6 +61,7 @@ FAST_RAM_ZERO_INIT static float   pidLooptime;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t filters[2];
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* gyroFilter;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* dtermFilter;
+FAST_RAM_ZERO_INIT static float rpmGyroLPFFreqCutoff;
 static float  notch_min_cutoff_pc;
 static float q_scale;
 static float q_scale_cutoff;
@@ -87,6 +88,7 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->rpm_notch_min_cutoff_pc = 100;
     config->rpm_q_scale = 10;
     config->rpm_q_scale_cutoff = 200;
+    config->rpm_gyro_lpf=0;
 }
 
 static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, const float q[], float looptime)
@@ -144,6 +146,12 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
         pt1FilterInit(&rpmFilters[i], pt1FilterGain(config->rpm_lpf, pidLooptime * 1e-6f));
     }
 
+    rpmGyroLPFFreqCutoff = config->rpm_gyro_lpf;
+    if (rpmGyroLPFFreqCutoff > 0 ) {
+		for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+			pt1FilterInit(&rpmGyroLPF[axis], pt1FilterGain(rpmGyroLPFFreqCutoff, pidLooptime * 1e-6f));
+		}
+    }
     erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE  / (motorConfig()->motorPoleCount / 2.0f);
 
     const float loopIterationsPerUpdate = MIN_UPDATE_T / (pidLooptime * 1e-6f);
@@ -171,6 +179,9 @@ static float applyFilter(rpmNotchFilter_t* filter, int axis, float value)
 
 float rpmFilterGyro(int axis, float value)
 {
+	if (rpmGyroLPFFreqCutoff >  0) {
+		value = pt1FilterApply(&rpmGyroLPF[axis],value);
+	}
     return applyFilter(gyroFilter, axis, value);
 }
 
@@ -193,15 +204,25 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     FAST_RAM static rpmNotchFilter_t* currentFilter = &filters[0];
     FAST_RAM static uint8_t hop;
 
-
+    float gyroLPFCutoff;
     for (int motor = 0; motor < getMotorCount(); motor++) {
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
         /*
         if (motor < 4) {
             DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
         } */
+        if ( (filteredMotorErpm[motor] * erpmToHz )  > gyroLPFCutoff ) {
+        	gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
+
+        }
     }
 
+    if  (rpmGyroLPFFreqCutoff > 0) {
+    	for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+    		gyroLPFCutoff = constrainf(gyroLPFCutoff,rpmGyroLPFFreqCutoff, 0.48f / (gyro.targetLooptime * 1e-6f));
+    		pt1FilterUpdateCutoff(&rpmGyroLPF[axis], pt1FilterGain(gyroLPFCutoff, pidLooptime * 1e-6f));
+        }
+	}
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
 
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
@@ -233,9 +254,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
         if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
             DEBUG_SET(DEBUG_RPM_FILTER, 0, frequency);
-            DEBUG_SET(DEBUG_RPM_FILTER, 1, currentFilter->q[0] * 100);
-            DEBUG_SET(DEBUG_RPM_FILTER, 2, currentFilter->q[1] * 100);
-            DEBUG_SET(DEBUG_RPM_FILTER, 3, currentFilter->q[2] * 100)
+            DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroLPFCutoff);
+            DEBUG_SET(DEBUG_RPM_FILTER, 2, rpmGyroLPFFreqCutoff);
+            DEBUG_SET(DEBUG_RPM_FILTER, 3, currentFilter->q[0] * 100)
         }
 
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
