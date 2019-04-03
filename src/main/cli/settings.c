@@ -1417,6 +1417,9 @@ const clivalue_t valueTable[] = {
     { "rpm_q_scale",  VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 10, 100 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_q_scale) },
 	 { "gyro_rpm_notch_q1",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 1, 3000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, gyro_rpm_notch_q1) },
 	 { "gyro_rpm_notch_q2",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 1, 3000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, gyro_rpm_notch_q2) },
+	 { "rpm_gyro_lpf",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf) },
+
+
 #endif
 
 #ifdef USE_RX_FLYSKY
