@@ -36,6 +36,7 @@
 #define SECONDS_PER_MINUTE      60.0f
 #define ERPM_PER_LSB            100.0f
 #define MIN_UPDATE_T            0.001f
+#define M_PI_FLOAT  3.14159265358979323846f
 
 #if defined(USE_RPM_FILTER)
 
@@ -65,6 +66,7 @@ FAST_RAM_ZERO_INIT static float rpmGyroLPFFreqCutoff;
 static float  notch_min_cutoff_pc;
 static float q_scale;
 static float q_scale_cutoff;
+static float dT;
 
 
 
@@ -141,16 +143,16 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
         // don't go quite to nyquist to avoid oscillations
         dtermFilter->maxHz = 0.48f / (pidLooptime * 1e-6f);
     }
-
+    dT = gyro.targetLooptime * 1e-6f;
     for (int i = 0; i < getMotorCount(); i++) {
         pt1FilterInit(&rpmFilters[i], pt1FilterGain(config->rpm_lpf, pidLooptime * 1e-6f));
     }
 
     rpmGyroLPFFreqCutoff = config->rpm_gyro_lpf;
     if (rpmGyroLPFFreqCutoff > 0 ) {
-		for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-			pt1FilterInit(&rpmGyroLPF[axis], pt1FilterGain(rpmGyroLPFFreqCutoff, pidLooptime * 1e-6f));
-		}
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+            pt1FilterInit(&rpmGyroLPF[axis], pt1FilterGain(rpmGyroLPFFreqCutoff, dT));
+        }
     }
     erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE  / (motorConfig()->motorPoleCount / 2.0f);
 
@@ -179,9 +181,21 @@ static float applyFilter(rpmNotchFilter_t* filter, int axis, float value)
 
 float rpmFilterGyro(int axis, float value)
 {
-	if (rpmGyroLPFFreqCutoff >  0) {
-		value = pt1FilterApply(&rpmGyroLPF[axis],value);
+    float tmp = value;
+    float f_cut = 0;
+    if (rpmGyroLPFFreqCutoff >  0) {
+	    value = pt1FilterApply(&rpmGyroLPF[axis],value);
+		f_cut = (rpmGyroLPF[0].k) / ((dT - rpmGyroLPF[0].k * dT) * 2 * M_PI_FLOAT);
+		if (f_cut <= rpmGyroLPFFreqCutoff) {
+		    value = tmp;
+		}
 	}
+    if ( axis == 0) {
+        DEBUG_SET(DEBUG_RPM_FILTER, 0, tmp);
+        DEBUG_SET(DEBUG_RPM_FILTER, 1, value);
+        DEBUG_SET(DEBUG_RPM_FILTER, 2, pidConfig()->pid_process_denom);
+        DEBUG_SET(DEBUG_RPM_FILTER, 3, f_cut);
+    }
     return applyFilter(gyroFilter, axis, value);
 }
 
@@ -212,16 +226,16 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
             DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
         } */
         if ( (filteredMotorErpm[motor] * erpmToHz )  > gyroLPFCutoff ) {
-        	gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
-
+            gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
         }
     }
 
     if  (rpmGyroLPFFreqCutoff > 0) {
-    	for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-    		gyroLPFCutoff = constrainf(gyroLPFCutoff,rpmGyroLPFFreqCutoff, 0.48f / (gyro.targetLooptime * 1e-6f));
-    		pt1FilterUpdateCutoff(&rpmGyroLPF[axis], pt1FilterGain(gyroLPFCutoff, pidLooptime * 1e-6f));
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+    	    gyroLPFCutoff = constrainf(gyroLPFCutoff,rpmGyroLPFFreqCutoff, 0.48f / (gyro.targetLooptime * 1e-6f));
+    	    pt1FilterUpdateCutoff(&rpmGyroLPF[axis], pt1FilterGain(gyroLPFCutoff, dT));
         }
+        //f_cut = (rpmGyroLPF[0].k) / ((dT - rpmGyroLPF[0].k * dT) * 2 * M_PI_FLOAT);
 	}
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
 
@@ -252,12 +266,13 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 //            q = 2.5f;
 //        }
 
-        if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
-            DEBUG_SET(DEBUG_RPM_FILTER, 0, frequency);
-            DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroLPFCutoff);
-            DEBUG_SET(DEBUG_RPM_FILTER, 2, rpmGyroLPFFreqCutoff);
-            DEBUG_SET(DEBUG_RPM_FILTER, 3, currentFilter->q[0] * 100)
-        }
+
+//        if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
+//            DEBUG_SET(DEBUG_RPM_FILTER, 0, frequency);
+//            DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroLPFCutoff);
+//            DEBUG_SET(DEBUG_RPM_FILTER, 2, rpmGyroLPFFreqCutoff);
+//            DEBUG_SET(DEBUG_RPM_FILTER, 3, f_cut);
+//        }
 
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
         /* DEBUG_SET(DEBUG_RPM_FILTER, 0, harmonic); */
