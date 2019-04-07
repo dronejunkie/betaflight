@@ -6,6 +6,7 @@ This is the official list of manufacturer ids (`manufacturer_id` in the target c
 |Manufacturer Id|Name|Contact|
 |-|-|-|
 |CUST|'Custom', to be used for homebrew targets||
+|CLRA|CLRACING LLC|https://cl-racing.myshopify.com/|
 |AFNG|AlienFlight NG|https://www.alienflightng.com/|
 |AIRB|Airbot|https://store.myairbot.com/|
 |BKMN|Jason Blackman|https://github.com/blckmn|
@@ -13,9 +14,12 @@ This is the official list of manufacturer ids (`manufacturer_id` in the target c
 |DYST|DongYang Smart Technology Co.,Ltd (dys)|http://www.dys.hk/|
 |FFPV|Furious FPV|https://furiousfpv.com/|
 |FLWO|Flywoo|https://flywoo.net/|
+|FOXE|Foxeer|http://www.foxeer.com/|
 |HAMO|Happymodel|http://www.happymodel.cn/|
 |HBRO|Holybro|http://www.holybro.com/index.html|
 |IFRC|iFlight Innovation Technology Ltd.|https://www.iflight-rc.com/|
+|JHEF|JHE\_FPV|https://github.com/atgfpeyv|
+|KLEE|Kevin Lee (WhitenoiseFPV)|https://whitenoisefpv.com/|
 |MTKS|Matek Systems|http://www.mateksys.com/|
 |RCTI|RCTimer|http://rctimer.com/|
 |SPRO|Seriously Pro Racing (SP Racing)|http://seriouslypro.com/|

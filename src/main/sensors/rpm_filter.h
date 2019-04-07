@@ -50,3 +50,4 @@ void  rpmFilterInit(const rpmFilterConfig_t *config);
 float rpmFilterGyro(int axis, float values);
 float rpmFilterDterm(int axis, float values);
 void  rpmFilterUpdate();
+bool isRpmFilterEnabled(void);

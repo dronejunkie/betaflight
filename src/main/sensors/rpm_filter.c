@@ -306,4 +306,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     }
 }
 
+bool isRpmFilterEnabled(void)
+{
+    return (motorConfig()->dev.useDshotTelemetry && (rpmFilterConfig()->gyro_rpm_notch_harmonics || rpmFilterConfig()->dterm_rpm_notch_harmonics));
+}
+
 #endif
