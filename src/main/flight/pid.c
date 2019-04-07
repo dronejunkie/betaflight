@@ -1386,9 +1386,9 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
             static float setpointChangePerIteration[XYZ_AXIS_COUNT];
             static float ffReservoir[XYZ_AXIS_COUNT];
             float rawSetpoint = getRawSetpoint(axis);
-            float prevFFResavoir = 0;
+            //float prevFFResavoir = 0;
             if (rawSetpoint != oldRawSetpoint[axis]) {
-            	prevFFResavoir = ffReservoir[axis];
+            	//prevFFResavoir = ffReservoir[axis];
                 ffReservoir[axis] += rawSetpoint - oldRawSetpoint[axis];
                 if (ffMinSpread) {
                     interpolationSteps[axis] = (ffMinSpread + 1.0f) * 0.001f * pidFrequency;
@@ -1397,7 +1397,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
                 }
                 setpointChangePerIteration[axis] = ffReservoir[axis] / interpolationSteps[axis];
                 oldRawSetpoint[axis] = rawSetpoint;
-                ffReservoir[axis] -= prevFFResavoir;
+                //ffReservoir[axis] -= prevFFResavoir;
             }
             if (interpolationSteps[axis]) {
                 pidSetpointDelta = setpointChangePerIteration[axis];
