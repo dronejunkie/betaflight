@@ -246,7 +246,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
         float q = currentFilter->q[harmonic];
         // Look for the next harmonic instead of parking. notch_min_cutoff_pc allow notch to go lower if required.
-        // currently hard coded to with q 10.
+        // currently hard coded with q 10.
 		if (frequency < notch_min_cutoff_pc * currentFilter->minHz) {
 		    hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
 		    frequency = (hop--) * motorFrequency[motor];
