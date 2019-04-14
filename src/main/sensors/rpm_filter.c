@@ -181,22 +181,26 @@ static float applyFilter(rpmNotchFilter_t* filter, int axis, float value)
 
 float rpmFilterGyro(int axis, float value)
 {
-    float tmp = value;
+    float raw = value;
     float f_cut = 0;
     if (rpmGyroLPFFreqCutoff >  0) {
+        // Still filter but do not use it until required.
 	    value = pt1FilterApply(&rpmGyroLPF[axis],value);
 		f_cut = (rpmGyroLPF[0].k) / ((dT - rpmGyroLPF[0].k * dT) * 2 * M_PI_FLOAT);
 		if (f_cut <= rpmGyroLPFFreqCutoff) {
-		    value = tmp;
+		    value = raw;
 		}
 	}
     if ( axis == 0) {
-        DEBUG_SET(DEBUG_RPM_FILTER, 0, tmp);
+        DEBUG_SET(DEBUG_RPM_FILTER, 0, raw);
         DEBUG_SET(DEBUG_RPM_FILTER, 1, value);
-        DEBUG_SET(DEBUG_RPM_FILTER, 2, pidConfig()->pid_process_denom);
-        DEBUG_SET(DEBUG_RPM_FILTER, 3, f_cut);
+        DEBUG_SET(DEBUG_RPM_FILTER, 2, f_cut);
     }
-    return applyFilter(gyroFilter, axis, value);
+    value = applyFilter(gyroFilter, axis, value);
+    if (axis == 0 ) {
+        DEBUG_SET(DEBUG_RPM_FILTER, 3, value);
+    }
+    return value;
 }
 
 float rpmFilterDterm(int axis, float value)
@@ -221,12 +225,12 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     float gyroLPFCutoff;
     for (int motor = 0; motor < getMotorCount(); motor++) {
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
-        /*
-        if (motor < 4) {
-            DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
-        } */
-        if ( (filteredMotorErpm[motor] * erpmToHz )  > gyroLPFCutoff ) {
+        if ( motor == 0 ) {
             gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
+        } else {
+            if ((filteredMotorErpm[motor] * erpmToHz) < gyroLPFCutoff ) {
+                gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
+            }
         }
     }
 
@@ -241,7 +245,8 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
         float q = currentFilter->q[harmonic];
-        // Look for the next harmonic.
+        // Look for the next harmonic instead of parking. notch_min_cutoff_pc allow notch to go lower if required.
+        // currently hard coded to with q 10.
 		if (frequency < notch_min_cutoff_pc * currentFilter->minHz) {
 		    hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
 		    frequency = (hop--) * motorFrequency[motor];
@@ -254,25 +259,11 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
         if ( frequency < currentFilter -> minHz) {
             q = 10.0f;
-        } else if ( frequency < q_scale_cutoff ) {
+        } else if ( frequency < q_scale_cutoff ) {  // from minHz -> q_scale_cutoff use different q is desired.
             q = q / q_scale;
         }
 
-//        if ( harmonic == 1 ) {
-//            q = 3.0f;
-//        }
-//
-//        if ( harmonic == 2 ) {
-//            q = 2.5f;
-//        }
 
-
-//        if ( ( motor == 0 ) && ( harmonic == 0 ) ) {
-//            DEBUG_SET(DEBUG_RPM_FILTER, 0, frequency);
-//            DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroLPFCutoff);
-//            DEBUG_SET(DEBUG_RPM_FILTER, 2, rpmGyroLPFFreqCutoff);
-//            DEBUG_SET(DEBUG_RPM_FILTER, 3, f_cut);
-//        }
 
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
         /* DEBUG_SET(DEBUG_RPM_FILTER, 0, harmonic); */
