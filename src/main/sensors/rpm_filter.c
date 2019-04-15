@@ -234,7 +234,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         }
     }
 
+
     if  (rpmGyroLPFFreqCutoff > 0) {
+        gyroLPFCutoff -= gyroLPFCutoff / currentFilter->q[0] / 2;  // set cutoff at the edge of the notch.
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
     	    gyroLPFCutoff = constrainf(gyroLPFCutoff,rpmGyroLPFFreqCutoff, 0.48f / (gyro.targetLooptime * 1e-6f));
     	    pt1FilterUpdateCutoff(&rpmGyroLPF[axis], pt1FilterGain(gyroLPFCutoff, dT));
