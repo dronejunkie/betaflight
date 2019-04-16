@@ -41,7 +41,8 @@
 #if defined(USE_RPM_FILTER)
 
 static pt1Filter_t rpmFilters[MAX_SUPPORTED_MOTORS];
-static pt1Filter_t rpmGyroLPF[XYZ_AXIS_COUNT];
+static pt1Filter_t gyroLPFFilter[XYZ_AXIS_COUNT];
+static biquadFilter_t dTermLPFFilter[XYZ_AXIS_COUNT];
 typedef struct rpmNotchFilter_s
 {
     uint8_t harmonics;
@@ -49,7 +50,8 @@ typedef struct rpmNotchFilter_s
     float   maxHz;
     float   q[3];
     float   loopTime;
-
+    float motorLowFreq;
+    float motorHighFreq;
     biquadFilter_t notch[XYZ_AXIS_COUNT][MAX_SUPPORTED_MOTORS][RPM_FILTER_MAXHARMONICS];
 } rpmNotchFilter_t;
 
@@ -62,11 +64,14 @@ FAST_RAM_ZERO_INIT static float   pidLooptime;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t filters[2];
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* gyroFilter;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* dtermFilter;
-FAST_RAM_ZERO_INIT static float rpmGyroLPFFreqCutoff;
+FAST_RAM_ZERO_INIT static float gyroLPFMin;
 static float  notch_min_cutoff_pc;
 static float q_scale;
 static float q_scale_cutoff;
 static float dT;
+static float dTermLPFMin;
+static float dTermLPFMax;
+
 
 
 
@@ -90,7 +95,9 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->rpm_notch_min_cutoff_pc = 100;
     config->rpm_q_scale = 10;
     config->rpm_q_scale_cutoff = 200;
-    config->rpm_gyro_lpf=0;
+    config->rpm_gyro_lpf = 0;
+    config->rpm_dterm_lpf_min = 0;
+    config->rpm_dterm_lpf_max = 0;
 }
 
 static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, const float q[], float looptime)
@@ -148,10 +155,19 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
         pt1FilterInit(&rpmFilters[i], pt1FilterGain(config->rpm_lpf, pidLooptime * 1e-6f));
     }
 
-    rpmGyroLPFFreqCutoff = config->rpm_gyro_lpf;
-    if (rpmGyroLPFFreqCutoff > 0 ) {
+    gyroLPFMin = config->rpm_gyro_lpf;
+    if (gyroLPFMin > 0 ) {
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-            pt1FilterInit(&rpmGyroLPF[axis], pt1FilterGain(rpmGyroLPFFreqCutoff, dT));
+            pt1FilterInit(&gyroLPFFilter[axis], pt1FilterGain(gyroLPFMin, dT));
+
+        }
+    }
+    dTermLPFMin = config->rpm_dterm_lpf_min;
+    dTermLPFMax = config->rpm_dterm_lpf_max;
+
+    if (dTermLPFMin > 0 ) {
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+            biquadFilterInitLPF(&dTermLPFFilter[axis], dTermLPFMin, pidLooptime);
         }
     }
     erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE  / (motorConfig()->motorPoleCount / 2.0f);
@@ -183,17 +199,17 @@ float rpmFilterGyro(int axis, float value)
 {
     float raw = value;
     float f_cut = 0;
-    if (rpmGyroLPFFreqCutoff >  0) {
+    if (gyroLPFMin >  0) {
         // Still filter but do not use it until required.
-	    value = pt1FilterApply(&rpmGyroLPF[axis],value);
-		f_cut = (rpmGyroLPF[0].k) / ((dT - rpmGyroLPF[0].k * dT) * 2 * M_PI_FLOAT);
-		if (f_cut <= rpmGyroLPFFreqCutoff) {
+	    value = pt1FilterApply(&gyroLPFFilter[axis],value);
+		f_cut = (gyroLPFFilter[0].k) / ((dT - gyroLPFFilter[0].k * dT) * 2 * M_PI_FLOAT);
+		if (gyroFilter->motorHighFreq <= gyroLPFMin) {
 		    value = raw;
 		}
 	}
     if ( axis == 0) {
         DEBUG_SET(DEBUG_RPM_FILTER, 0, raw);
-        DEBUG_SET(DEBUG_RPM_FILTER, 1, value);
+        DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroFilter->motorLowFreq);
         DEBUG_SET(DEBUG_RPM_FILTER, 2, f_cut);
     }
     value = applyFilter(gyroFilter, axis, value);
@@ -205,6 +221,9 @@ float rpmFilterGyro(int axis, float value)
 
 float rpmFilterDterm(int axis, float value)
 {
+    if (dTermLPFMin > 0) {
+        value = biquadFilterApply(&dTermLPFFilter[axis],value);
+    }
     return applyFilter(dtermFilter, axis, value);
 }
 
@@ -227,22 +246,33 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
         if ( motor == 0 ) {
             gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
+            currentFilter-> motorHighFreq = gyroLPFCutoff;
         } else {
-            if ((filteredMotorErpm[motor] * erpmToHz) < gyroLPFCutoff ) {
-                gyroLPFCutoff = filteredMotorErpm[motor] * erpmToHz;
-            }
+            gyroLPFCutoff = MIN(gyroLPFCutoff,filteredMotorErpm[motor] * erpmToHz);
+            currentFilter-> motorHighFreq = MAX (currentFilter-> motorHighFreq,filteredMotorErpm[motor] * erpmToHz);
         }
     }
+    currentFilter-> motorLowFreq = gyroLPFCutoff;
+    float dTermLPFCutoff;
+    if (dTermLPFMin > 0) {
+        dTermLPFCutoff = gyroLPFCutoff;
+        dTermLPFCutoff -= dTermLPFCutoff/5.f/2.f;  // hard code to q 5
+        dTermLPFCutoff = constrainf(dTermLPFCutoff,dTermLPFMin,dTermLPFMax);
 
-
-    if  (rpmGyroLPFFreqCutoff > 0) {
-        gyroLPFCutoff -= gyroLPFCutoff / currentFilter->q[0] / 2;  // set cutoff at the edge of the notch.
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-    	    gyroLPFCutoff = constrainf(gyroLPFCutoff,rpmGyroLPFFreqCutoff, 0.48f / (gyro.targetLooptime * 1e-6f));
-    	    pt1FilterUpdateCutoff(&rpmGyroLPF[axis], pt1FilterGain(gyroLPFCutoff, dT));
+            biquadFilterUpdateLPF(&dTermLPFFilter[axis],dTermLPFCutoff,pidLooptime);
         }
-        //f_cut = (rpmGyroLPF[0].k) / ((dT - rpmGyroLPF[0].k * dT) * 2 * M_PI_FLOAT);
+     }
+    if  (gyroLPFMin > 0) {
+        gyroLPFCutoff -= gyroLPFCutoff / currentFilter->q[0] / 2;  // set cutoff at the edge of the notch.
+        gyroLPFCutoff = constrainf(gyroLPFCutoff,gyroLPFMin, 0.48f / (gyro.targetLooptime * 1e-6f));
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+    	    pt1FilterUpdateCutoff(&gyroLPFFilter[axis], pt1FilterGain(gyroLPFCutoff, dT));
+        }
+        //f_cut = (gyroLPFFilter[0].k) / ((dT - gyroLPFFilter[0].k * dT) * 2 * M_PI_FLOAT);
 	}
+
+
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
 
         float frequency = (harmonic + hop + 1) * motorFrequency[motor];
