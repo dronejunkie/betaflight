@@ -101,6 +101,7 @@ typedef enum {
     DEBUG_D_MIN,
     DEBUG_AC_CORRECTION,
     DEBUG_AC_ERROR,
+    DEBUG_RPM_DTERM,
     DEBUG_COUNT
 } debugType_e;
 

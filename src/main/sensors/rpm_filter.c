@@ -164,6 +164,9 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     }
     dTermLPFMin = config->rpm_dterm_lpf_min;
     dTermLPFMax = config->rpm_dterm_lpf_max;
+    if (dTermLPFMin >= dTermLPFMax ) {
+        dTermLPFMin = 0;
+    }
 
     if (dTermLPFMin > 0 ) {
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
@@ -209,20 +212,29 @@ float rpmFilterGyro(int axis, float value)
 	}
     if ( axis == 0) {
         DEBUG_SET(DEBUG_RPM_FILTER, 0, raw);
-        DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroFilter->motorLowFreq);
+        DEBUG_SET(DEBUG_RPM_FILTER, 1, gyroFilter->motorHighFreq);
         DEBUG_SET(DEBUG_RPM_FILTER, 2, f_cut);
-    }
-    value = applyFilter(gyroFilter, axis, value);
-    if (axis == 0 ) {
         DEBUG_SET(DEBUG_RPM_FILTER, 3, value);
     }
+    value = applyFilter(gyroFilter, axis, value);
+//    if (axis == 0 ) {
+//        DEBUG_SET(DEBUG_RPM_FILTER, 3, value);
+//    }
     return value;
 }
 
 float rpmFilterDterm(int axis, float value)
 {
+    float raw = value;
+
     if (dTermLPFMin > 0) {
         value = biquadFilterApply(&dTermLPFFilter[axis],value);
+    }
+    if ( axis == 0) {
+        DEBUG_SET(DEBUG_RPM_DTERM, 0, raw);
+        DEBUG_SET(DEBUG_RPM_DTERM, 1, value);
+        DEBUG_SET(DEBUG_RPM_DTERM, 2, gyroFilter->motorLowFreq);
+        DEBUG_SET(DEBUG_RPM_DTERM, 3, gyroFilter->motorHighFreq);
     }
     return applyFilter(dtermFilter, axis, value);
 }
@@ -256,7 +268,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     float dTermLPFCutoff;
     if (dTermLPFMin > 0) {
         dTermLPFCutoff = gyroLPFCutoff;
-        dTermLPFCutoff -= dTermLPFCutoff/5.f/2.f;  // hard code to q 5
+        dTermLPFCutoff -= dTermLPFCutoff/5.0f/2.0f;  // hard code to q 5
         dTermLPFCutoff = constrainf(dTermLPFCutoff,dTermLPFMin,dTermLPFMax);
 
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
