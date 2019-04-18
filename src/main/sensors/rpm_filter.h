@@ -43,7 +43,6 @@ typedef struct rpmFilterConfig_s
     uint8_t  rpm_q_scale;
     uint16_t rpm_gyro_lpf;
     uint16_t rpm_dterm_lpf_min;
-    uint16_t rpm_dterm_lpf_max;
 } rpmFilterConfig_t;
 
 PG_DECLARE(rpmFilterConfig_t, rpmFilterConfig);

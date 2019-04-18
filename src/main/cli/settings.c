@@ -1419,7 +1419,6 @@ const clivalue_t valueTable[] = {
 	 { "gyro_rpm_notch_q2",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 1, 3000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, gyro_rpm_notch_q2) },
 	 { "rpm_gyro_lpf",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf) },
 	 { "rpm_dterm_lpf_min",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_min) },
-	 { "rpm_dterm_lpf_max",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_max) },
 
 
 #endif

@@ -97,7 +97,7 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->rpm_q_scale_cutoff = 200;
     config->rpm_gyro_lpf = 0;
     config->rpm_dterm_lpf_min = 0;
-    config->rpm_dterm_lpf_max = 0;
+
 }
 
 static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, const float q[], float looptime)
@@ -163,7 +163,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
         }
     }
     dTermLPFMin = config->rpm_dterm_lpf_min;
-    dTermLPFMax = config->rpm_dterm_lpf_max;
+    dTermLPFMax = 0.48f / (gyro.targetLooptime * 1e-6f);
     if (dTermLPFMin >= dTermLPFMax ) {
         dTermLPFMin = 0;
     }
@@ -268,7 +268,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     float dTermLPFCutoff;
     if (dTermLPFMin > 0) {
         dTermLPFCutoff = gyroLPFCutoff;
-        dTermLPFCutoff -= dTermLPFCutoff/5.0f/2.0f;  // hard code to q 5
+        dTermLPFCutoff -= dTermLPFCutoff/currentFilter->q[0]/2.0f + 5.0f;
         dTermLPFCutoff = constrainf(dTermLPFCutoff,dTermLPFMin,dTermLPFMax);
 
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
