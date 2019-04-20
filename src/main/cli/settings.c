@@ -453,6 +453,11 @@ static const char * const lookupTableGyroFilterDebug[] = {
     "ROLL", "PITCH", "YAW"
 };
 
+static const char * const lookupTableDtermFilterLocation[] = {
+    "GYRO", "DTERM"
+};
+
+
 #define LOOKUP_TABLE_ENTRY(name) { name, ARRAYLEN(name) }
 
 const lookupTableEntry_t lookupTables[] = {
@@ -564,6 +569,7 @@ const lookupTableEntry_t lookupTables[] = {
 #endif
 
     LOOKUP_TABLE_ENTRY(lookupTableGyroFilterDebug),
+    LOOKUP_TABLE_ENTRY(lookupTableDtermFilterLocation),
 };
 
 #undef LOOKUP_TABLE_ENTRY
@@ -1020,7 +1026,7 @@ const clivalue_t valueTable[] = {
     { "ff_from_interpolated_sp",    VAR_UINT8 | PROFILE_VALUE | MODE_LOOKUP, .config.lookup = {TABLE_OFF_ON}, PG_PID_PROFILE, offsetof(pidProfile_t, ff_from_interpolated_sp) },
     { "ff_max_rate",                VAR_UINT16| PROFILE_VALUE, .config.minmaxUnsigned = {0, 5000}, PG_PID_PROFILE, offsetof(pidProfile_t, ff_max_rate) },
     { "ff_min_spread",                VAR_UINT8| PROFILE_VALUE, .config.minmaxUnsigned = {0, 50}, PG_PID_PROFILE, offsetof(pidProfile_t, ff_min_spread) },
-
+    { "dterm_filter_location",         VAR_UINT8  | PROFILE_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_DTERM_FILTER_LOCATION }, PG_PID_PROFILE, offsetof(pidProfile_t, dterm_filter_location) },
 // PG_TELEMETRY_CONFIG
 #ifdef USE_TELEMETRY
     { "tlm_inverted",               VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_TELEMETRY_CONFIG, offsetof(telemetryConfig_t, telemetry_inverted) },

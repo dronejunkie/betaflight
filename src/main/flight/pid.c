@@ -207,6 +207,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .ff_from_interpolated_sp = 0,
         .ff_max_rate = 0,
         .ff_min_spread = 0,
+        .dterm_filter_location = GYRO,
     );
 #ifndef USE_D_MIN
     pidProfile->pid[PID_ROLL].D = 30;
@@ -1288,12 +1289,14 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
     float gyroRateDterm[XYZ_AXIS_COUNT];
     for (int axis = FD_ROLL; axis <= FD_YAW; ++axis) {
         gyroRateDterm[axis] = gyro.gyroADCf[axis];
+        if (pidProfile->dterm_filter_location == GYRO) {
 #ifdef USE_RPM_FILTER
-        gyroRateDterm[axis] = rpmFilterDterm(axis,gyroRateDterm[axis]);
+            gyroRateDterm[axis] = rpmFilterDterm(axis,gyroRateDterm[axis]);
 #endif
-        gyroRateDterm[axis] = dtermNotchApplyFn((filter_t *) &dtermNotch[axis], gyroRateDterm[axis]);
-        gyroRateDterm[axis] = dtermLowpassApplyFn((filter_t *) &dtermLowpass[axis], gyroRateDterm[axis]);
-        gyroRateDterm[axis] = dtermLowpass2ApplyFn((filter_t *) &dtermLowpass2[axis], gyroRateDterm[axis]);
+            gyroRateDterm[axis] = dtermNotchApplyFn((filter_t *) &dtermNotch[axis], gyroRateDterm[axis]);
+            gyroRateDterm[axis] = dtermLowpassApplyFn((filter_t *) &dtermLowpass[axis], gyroRateDterm[axis]);
+            gyroRateDterm[axis] = dtermLowpass2ApplyFn((filter_t *) &dtermLowpass2[axis], gyroRateDterm[axis]);
+        }
     }
 
     rotateItermAndAxisError();
@@ -1522,6 +1525,16 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
             }
         }
 #endif
+
+        if (pidProfile->dterm_filter_location == DTERM) {
+#ifdef USE_RPM_FILTER
+            pidData[axis].D = rpmFilterDterm(axis,pidData[axis].D);
+#endif
+            pidData[axis].D = dtermNotchApplyFn((filter_t *) &dtermNotch[axis], pidData[axis].D);
+            pidData[axis].D = dtermLowpassApplyFn((filter_t *) &dtermLowpass[axis], pidData[axis].D);
+            pidData[axis].D = dtermLowpass2ApplyFn((filter_t *) &dtermLowpass2[axis], pidData[axis].D);
+        }
+
         // calculating the PID sum
         const float pidSum = pidData[axis].P + pidData[axis].I + pidData[axis].D + pidData[axis].F;
 #ifdef USE_INTEGRATED_YAW_CONTROL

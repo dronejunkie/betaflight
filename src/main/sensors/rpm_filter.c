@@ -228,7 +228,7 @@ float rpmFilterDterm(int axis, float value)
     float raw = value;
 
     if (dTermLPFMin > 0) {
-        value = biquadFilterApply(&dTermLPFFilter[axis],value);
+        value = biquadFilterApplyDF1(&dTermLPFFilter[axis],value);
     }
     if ( axis == 0) {
         DEBUG_SET(DEBUG_RPM_DTERM, 0, raw);

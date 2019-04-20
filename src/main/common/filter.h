@@ -54,6 +54,8 @@ typedef enum {
     FILTER_BIQUAD,
 } lowpassFilterType_e;
 
+
+
 typedef enum {
     FILTER_LPF,    // 2nd order Butterworth section
     FILTER_NOTCH,

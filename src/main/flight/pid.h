@@ -99,6 +99,11 @@ typedef enum {
     ITERM_RELAX_SETPOINT
 } itermRelaxType_e;
 
+typedef enum {
+    GYRO,
+    DTERM,
+} dtermFilterLocation_e;
+
 typedef struct pidProfile_s {
     uint16_t yaw_lowpass_hz;                // Additional yaw filter when yaw axis too noisy
     uint16_t dterm_lowpass_hz;              // Delta Filter in hz
@@ -171,6 +176,7 @@ typedef struct pidProfile_s {
     uint8_t ff_from_interpolated_sp;        // Calculate FF from interpolated setpoint
     uint16_t ff_max_rate;                    // Max implied setpoint rate to allow for FF
     uint8_t ff_min_spread;                  // Spread ff out over at least min spread ms
+    uint8_t dterm_filter_location;                  // dterm filter location
 } pidProfile_t;
 
 PG_DECLARE_ARRAY(pidProfile_t, PID_PROFILE_COUNT, pidProfiles);
