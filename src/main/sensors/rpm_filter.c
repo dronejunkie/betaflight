@@ -268,7 +268,8 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     float dTermLPFCutoff;
     if (dTermLPFMin > 0) {
         dTermLPFCutoff = gyroLPFCutoff;
-        dTermLPFCutoff -= dTermLPFCutoff/currentFilter->q[0]/2.0f + 5.0f;
+        //dTermLPFCutoff -= dTermLPFCutoff/currentFilter->q[0]/2.0f + 5.0f;
+        dTermLPFCutoff -= 30.0f;
         dTermLPFCutoff = constrainf(dTermLPFCutoff,dTermLPFMin,dTermLPFMax);
 
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
@@ -276,7 +277,8 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         }
      }
     if  (gyroLPFMin > 0) {
-        gyroLPFCutoff -= gyroLPFCutoff / currentFilter->q[0] / 2;  // set cutoff at the edge of the notch.
+        //gyroLPFCutoff -= gyroLPFCutoff / currentFilter->q[0] / 2;  // set cutoff at the edge of the notch.
+        gyroLPFCutoff -=  25.0f;
         gyroLPFCutoff = constrainf(gyroLPFCutoff,gyroLPFMin, 0.48f / (gyro.targetLooptime * 1e-6f));
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
     	    pt1FilterUpdateCutoff(&gyroLPFFilter[axis], pt1FilterGain(gyroLPFCutoff, dT));
