@@ -1426,8 +1426,8 @@ const clivalue_t valueTable[] = {
     { "rpm_gyro_lpf",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf) },
     { "rpm_dterm_lpf_min",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_min) },
     { "rpm_dterm_lpf_max",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_max) },
-    { "rpm_gyro_lowpass_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf_type) },
-    { "rpm_dterm_lowpass_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_type) },
+    { "rpm_gyro_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf_type) },
+    { "rpm_dterm_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_type) },
 
 #endif
 
