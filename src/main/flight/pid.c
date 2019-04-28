@@ -34,6 +34,7 @@
 
 #include "config/config_reset.h"
 
+#include "drivers/pwm_output.h"
 #include "drivers/sound_beeper.h"
 #include "drivers/time.h"
 
@@ -168,7 +169,6 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .throttle_boost = 5,
         .throttle_boost_cutoff = 15,
         .iterm_rotation = false,
-        .smart_feedforward = false,
         .iterm_relax = ITERM_RELAX_RP,
         .iterm_relax_cutoff = ITERM_RELAX_CUTOFF_DEFAULT,
         .iterm_relax_type = ITERM_RELAX_SETPOINT,
@@ -185,9 +185,9 @@ void resetPidProfile(pidProfile_t *pidProfile)
                                     // overridden and the static lowpass 1 is disabled. We can't set this
                                     // value to 0 otherwise Configurator versions 10.4 and earlier will also
                                     // reset the lowpass filter type to PT1 overriding the desired BIQUAD setting.
-        .dterm_lowpass2_hz = 150,   // second Dterm LPF ON by default
+        .dterm_lowpass2_hz = 100,   // second Dterm LPF ON by default
         .dterm_filter_type = FILTER_BIQUAD,
-        .dterm_filter2_type = FILTER_BIQUAD,
+        .dterm_filter2_type = FILTER_PT1,
         .dyn_lpf_dterm_min_hz = 150,
         .dyn_lpf_dterm_max_hz = 250,
         .launchControlMode = LAUNCH_CONTROL_MODE_NORMAL,
@@ -227,6 +227,9 @@ static void pidSetTargetLooptime(uint32_t pidLooptime)
     targetPidLooptime = pidLooptime;
     dT = targetPidLooptime * 1e-6f;
     pidFrequency = 1.0f / dT;
+#ifdef USE_DSHOT
+    setDshotPidLoopTime(targetPidLooptime);
+#endif
 }
 
 static FAST_RAM float itermAccelerator = 1.0f;
@@ -504,10 +507,6 @@ pt1Filter_t throttleLpf;
 #endif
 static FAST_RAM_ZERO_INIT bool itermRotation;
 
-#if defined(USE_SMART_FEEDFORWARD)
-static FAST_RAM_ZERO_INIT bool smartFeedforward;
-#endif
-
 #ifdef USE_LAUNCH_CONTROL
 static FAST_RAM_ZERO_INIT uint8_t launchControlMode;
 static FAST_RAM_ZERO_INIT uint8_t launchControlAngleLimit;
@@ -625,10 +624,6 @@ void pidInitConfig(const pidProfile_t *pidProfile)
     if (antiGravityMode == ANTI_GRAVITY_SMOOTH) {
         antiGravityOsdCutoff += ((itermAcceleratorGain - 1000) / 1000.0f) * 0.25f;
     }
-
-#if defined(USE_SMART_FEEDFORWARD)
-    smartFeedforward = pidProfile->smart_feedforward;
-#endif
 
 #if defined(USE_ITERM_RELAX)
     itermRelax = pidProfile->iterm_relax;
@@ -897,8 +892,13 @@ static void detectAndSetCrashRecovery(
                 && fabsf(delta) > crashDtermThreshold
                 && fabsf(errorRate) > crashGyroThreshold
                 && fabsf(getSetpointRate(axis)) < crashSetpointThreshold) {
-                inCrashRecoveryMode = true;
-                crashDetectedAtUs = currentTimeUs;
+                if (crash_recovery == PID_CRASH_RECOVERY_DISARM) {
+                    setArmingDisabled(ARMING_DISABLED_CRASH_DETECTED);
+                    disarm();
+                } else {
+                    inCrashRecoveryMode = true;
+                    crashDetectedAtUs = currentTimeUs;
+                }
             }
             if (inCrashRecoveryMode && cmpTimeUs(currentTimeUs, crashDetectedAtUs) < crashTimeDelayUs && (fabsf(errorRate) < crashGyroThreshold
                 || fabsf(getSetpointRate(axis)) > crashSetpointThreshold)) {
@@ -1066,21 +1066,6 @@ float FAST_CODE applyRcSmoothingDerivativeFilter(int axis, float pidSetpointDelt
     return ret;
 }
 #endif // USE_RC_SMOOTHING_FILTER
-
-#ifdef USE_SMART_FEEDFORWARD
-void FAST_CODE applySmartFeedforward(int axis)
-{
-    if (smartFeedforward) {
-        if (pidData[axis].P * pidData[axis].F > 0) {
-            if (fabsf(pidData[axis].F) > fabsf(pidData[axis].P)) {
-                pidData[axis].P = 0;
-            } else {
-                pidData[axis].F = 0;
-            }
-        }
-    }
-}
-#endif // USE_SMART_FEEDFORWARD
 
 #if defined(USE_ITERM_RELAX)
 #if defined(USE_ABSOLUTE_CONTROL)
@@ -1478,6 +1463,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
             float transition = feedForwardTransition > 0 ? MIN(1.f, getRcDeflectionAbs(axis) * feedForwardTransition) : 1;
             pidData[axis].F = feedforwardGain * transition * pidSetpointDelta * pidFrequency;
 
+
             if (ffMaxImpliedRate > 0.0f) {
                 if (fabsf(currentPidSetpoint) > ffMaxImpliedRate) {
                     pidData[axis].F = 0;
@@ -1488,9 +1474,6 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
                 }
             }
 
-#if defined(USE_SMART_FEEDFORWARD)
-            applySmartFeedforward(axis);
-#endif
         } else {
             pidData[axis].F = 0;
         }

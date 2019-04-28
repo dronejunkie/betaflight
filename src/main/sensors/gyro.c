@@ -208,8 +208,8 @@ void pgResetFn_gyroConfig(gyroConfig_t *gyroConfig)
                                         // overridden and the static lowpass 1 is disabled. We can't set this
                                         // value to 0 otherwise Configurator versions 10.4 and earlier will also
                                         // reset the lowpass filter type to PT1 overriding the desired BIQUAD setting.
-    gyroConfig->gyro_lowpass2_type = FILTER_BIQUAD;
-    gyroConfig->gyro_lowpass2_hz = 0;
+    gyroConfig->gyro_lowpass2_type = FILTER_PT1;
+    gyroConfig->gyro_lowpass2_hz = 150;
     gyroConfig->gyro_high_fsr = false;
     gyroConfig->gyro_to_use = GYRO_CONFIG_USE_GYRO_DEFAULT;
     gyroConfig->gyro_soft_notch_hz_1 = 0;
@@ -514,6 +514,7 @@ bool gyroInit(void)
     case DEBUG_DUAL_GYRO_COMBINE:
     case DEBUG_DUAL_GYRO_DIFF:
     case DEBUG_DUAL_GYRO_RAW:
+    case DEBUG_DUAL_GYRO_SCALED:
         useDualGyroDebugging = true;
         break;
     }
@@ -538,7 +539,7 @@ bool gyroInit(void)
     }
 
 #if defined(USE_MULTI_GYRO)
-    if ((gyroToUse == GYRO_CONFIG_USE_GYRO_BOTH && !(gyroDetectionFlags & DETECTED_BOTH_GYROS))
+    if ((gyroToUse == GYRO_CONFIG_USE_GYRO_BOTH && !((gyroDetectionFlags & DETECTED_BOTH_GYROS) == DETECTED_BOTH_GYROS))
         || (gyroToUse == GYRO_CONFIG_USE_GYRO_1 && !(gyroDetectionFlags & DETECTED_GYRO_1))
         || (gyroToUse == GYRO_CONFIG_USE_GYRO_2 && !(gyroDetectionFlags & DETECTED_GYRO_2))) {
         if (gyroDetectionFlags & DETECTED_GYRO_1) {
@@ -551,7 +552,7 @@ bool gyroInit(void)
     }
 
     // Only allow using both gyros simultaneously if they are the same hardware type.
-    if ((gyroDetectionFlags & DETECTED_BOTH_GYROS) && gyroSensor1.gyroDev.gyroHardware == gyroSensor2.gyroDev.gyroHardware) {
+    if (((gyroDetectionFlags & DETECTED_BOTH_GYROS) == DETECTED_BOTH_GYROS) && gyroSensor1.gyroDev.gyroHardware == gyroSensor2.gyroDev.gyroHardware) {
         gyroDetectionFlags |= DETECTED_DUAL_GYROS;
     } else if (gyroToUse == GYRO_CONFIG_USE_GYRO_BOTH) {
         // If the user selected "BOTH" and they are not the same type, then reset to using only the first gyro.
@@ -1098,6 +1099,8 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
             DEBUG_SET(DEBUG_DUAL_GYRO, 1, lrintf(gyroSensor1.gyroDev.gyroADCf[Y]));
             DEBUG_SET(DEBUG_DUAL_GYRO_COMBINE, 0, lrintf(gyro.gyroADCf[X]));
             DEBUG_SET(DEBUG_DUAL_GYRO_COMBINE, 1, lrintf(gyro.gyroADCf[Y]));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 0, lrintf(gyroSensor1.gyroDev.gyroADC[X] * gyroSensor1.gyroDev.scale));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 1, lrintf(gyroSensor1.gyroDev.gyroADC[Y] * gyroSensor1.gyroDev.scale));
         }
         break;
 #ifdef USE_MULTI_GYRO
@@ -1121,6 +1124,8 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
             DEBUG_SET(DEBUG_DUAL_GYRO, 3, lrintf(gyroSensor2.gyroDev.gyroADCf[Y]));
             DEBUG_SET(DEBUG_DUAL_GYRO_COMBINE, 2, lrintf(gyro.gyroADCf[X]));
             DEBUG_SET(DEBUG_DUAL_GYRO_COMBINE, 3, lrintf(gyro.gyroADCf[Y]));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 2, lrintf(gyroSensor2.gyroDev.gyroADC[X] * gyroSensor2.gyroDev.scale));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 3, lrintf(gyroSensor2.gyroDev.gyroADC[Y] * gyroSensor2.gyroDev.scale));
         }
         break;
     case GYRO_CONFIG_USE_GYRO_BOTH:
@@ -1152,6 +1157,10 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
             DEBUG_SET(DEBUG_DUAL_GYRO_DIFF, 0, lrintf(gyroSensor1.gyroDev.gyroADCf[X] - gyroSensor2.gyroDev.gyroADCf[X]));
             DEBUG_SET(DEBUG_DUAL_GYRO_DIFF, 1, lrintf(gyroSensor1.gyroDev.gyroADCf[Y] - gyroSensor2.gyroDev.gyroADCf[Y]));
             DEBUG_SET(DEBUG_DUAL_GYRO_DIFF, 2, lrintf(gyroSensor1.gyroDev.gyroADCf[Z] - gyroSensor2.gyroDev.gyroADCf[Z]));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 0, lrintf(gyroSensor1.gyroDev.gyroADC[X] * gyroSensor1.gyroDev.scale));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 1, lrintf(gyroSensor1.gyroDev.gyroADC[Y] * gyroSensor1.gyroDev.scale));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 2, lrintf(gyroSensor2.gyroDev.gyroADC[X] * gyroSensor2.gyroDev.scale));
+            DEBUG_SET(DEBUG_DUAL_GYRO_SCALED, 3, lrintf(gyroSensor2.gyroDev.gyroADC[Y] * gyroSensor2.gyroDev.scale));
         }
         break;
 #endif
