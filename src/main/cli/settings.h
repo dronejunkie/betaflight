@@ -134,6 +134,7 @@ typedef enum {
 #endif
     TABLE_GYRO_FILTER_DEBUG,
     TABLE_DTERM_FILTER_LOCATION,
+    TABLE_RPM_LOWPASS_TYPE,
     LOOKUP_TABLE_COUNT
 } lookupTableIndex_e;
 

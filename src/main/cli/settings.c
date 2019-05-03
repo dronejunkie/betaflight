@@ -457,6 +457,13 @@ static const char * const lookupTableDtermFilterLocation[] = {
     "GYRO", "DTERM"
 };
 
+#ifdef USE_RPM_FILTER
+static const char * const lookupTableRPMLowpassType[] = {
+    "PT1",
+    "BIQUAD",
+    "DOUBLE_PT1",
+};
+#endif
 
 #define LOOKUP_TABLE_ENTRY(name) { name, ARRAYLEN(name) }
 
@@ -570,6 +577,9 @@ const lookupTableEntry_t lookupTables[] = {
 
     LOOKUP_TABLE_ENTRY(lookupTableGyroFilterDebug),
     LOOKUP_TABLE_ENTRY(lookupTableDtermFilterLocation),
+#ifdef USE_RPM_FILTER
+    LOOKUP_TABLE_ENTRY(lookupTableRPMLowpassType),
+#endif
 };
 
 #undef LOOKUP_TABLE_ENTRY
@@ -1426,8 +1436,8 @@ const clivalue_t valueTable[] = {
     { "rpm_gyro_lpf",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf) },
     { "rpm_dterm_lpf_min",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_min) },
     { "rpm_dterm_lpf_max",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_max) },
-    { "rpm_gyro_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf_type) },
-    { "rpm_dterm_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_type) },
+    { "rpm_gyro_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_RPM_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf_type) },
+    { "rpm_dterm_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_RPM_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_type) },
 
 #endif
 
