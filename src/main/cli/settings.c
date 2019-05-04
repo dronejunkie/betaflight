@@ -461,7 +461,7 @@ static const char * const lookupTableDtermFilterLocation[] = {
 static const char * const lookupTableRPMLowpassType[] = {
     "PT1",
     "BIQUAD",
-    "DOUBLE_PT1",
+    "DUAL_PT1",
 };
 #endif
 
