@@ -463,6 +463,11 @@ static const char * const lookupTableRPMLowpassType[] = {
     "BIQUAD",
     "DUAL_PT1",
 };
+
+static const char * const lookupRPMCodeType[] = {
+    "CURRENT",
+    "EXPERIMENTAL",
+};
 #endif
 
 #define LOOKUP_TABLE_ENTRY(name) { name, ARRAYLEN(name) }
@@ -579,6 +584,7 @@ const lookupTableEntry_t lookupTables[] = {
     LOOKUP_TABLE_ENTRY(lookupTableDtermFilterLocation),
 #ifdef USE_RPM_FILTER
     LOOKUP_TABLE_ENTRY(lookupTableRPMLowpassType),
+    LOOKUP_TABLE_ENTRY(lookupRPMCodeType),
 #endif
 };
 
@@ -1438,6 +1444,7 @@ const clivalue_t valueTable[] = {
     { "rpm_dterm_lpf_max",  VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_max) },
     { "rpm_gyro_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_RPM_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_gyro_lpf_type) },
     { "rpm_dterm_lpf_type",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_RPM_LOWPASS_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_dterm_lpf_type) },
+    { "rpm_code",  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_RPM_CODE_TYPE }, PG_RPM_FILTER_CONFIG, offsetof(rpmFilterConfig_t, rpm_code) },
 
 #endif
 

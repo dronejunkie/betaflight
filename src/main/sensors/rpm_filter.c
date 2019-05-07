@@ -86,6 +86,7 @@ static float dTermLPFMin;
 static float dTermLPFMax;
 static uint8_t gyroLPFType;
 static uint8_t dTermLPFType;
+static uint8_t rpmCode;
 
 
 
@@ -116,6 +117,7 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->rpm_dterm_lpf_max = 0;
     config->rpm_gyro_lpf_type = FILTER_PT1;
     config->rpm_dterm_lpf_type = FILTER_BIQUAD;
+    config->rpm_code = RPM_CODE_EXPERIMENTAL;
 }
 
 static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, const float q[], float looptime)
@@ -147,6 +149,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
 
     gyroLPFType = config->rpm_gyro_lpf_type;
     dTermLPFType = config->rpm_dterm_lpf_type;
+    rpmCode = config->rpm_code;
 
 
     pidLooptime = gyro.targetLooptime * pidConfig()->pid_process_denom;
@@ -404,26 +407,29 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
 
-        float frequency = (harmonic + hop + 1) * motorFrequency[motor];
+        float frequency = 0;
         float q = currentFilter->q[harmonic];
-        // Look for the next harmonic instead of parking. notch_min_cutoff_pc allow notch to go lower if required.
-        // currently hard coded with q 10.
-		if (frequency < notch_min_cutoff_pc * currentFilter->minHz) {
-		    hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
-		    frequency = (hop--) * motorFrequency[motor];
-		}
+        if (rpmCode == RPM_CODE_CURRENT) {
+            frequency = (harmonic + 1) * motorFrequency[motor];
+            frequency = constrainf(frequency, currentFilter->minHz, currentFilter->maxHz);
+        } else {
+            frequency = (harmonic + hop + 1) * motorFrequency[motor];
 
-        frequency = constrainf(frequency, currentFilter->minHz * notch_min_cutoff_pc , currentFilter->maxHz);
-
-        biquadFilter_t* template = &currentFilter->notch[0][motor][harmonic];
-
-
-        if ( frequency < currentFilter -> minHz) {
-            q = 10.0f;
-        } else if ( frequency < q_scale_cutoff ) {  // from minHz -> q_scale_cutoff use different q is desired.
-            q = q / q_scale;
+            // Look for the next harmonic instead of parking. notch_min_cutoff_pc allow notch to go lower if required.
+            // currently hard coded with q 10.
+            if (frequency < notch_min_cutoff_pc * currentFilter->minHz) {
+                hop = ceilf((notch_min_cutoff_pc  * currentFilter->minHz) / (float) motorFrequency[motor]);
+                frequency = (hop--) * motorFrequency[motor];
+            }
+            frequency = constrainf(frequency, currentFilter->minHz * notch_min_cutoff_pc , currentFilter->maxHz);
+            if ( frequency < currentFilter -> minHz) {
+                q = 10.0f;
+            } else if ( frequency < q_scale_cutoff ) {  // from minHz -> q_scale_cutoff use different q is desired.
+                q = q / q_scale;
+            }
         }
 
+        biquadFilter_t* template = &currentFilter->notch[0][motor][harmonic];
 
 
         // uncomment below to debug filter stepping. Need to also comment out motor rpm DEBUG_SET above
@@ -444,7 +450,9 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
 
         if (++harmonic == currentFilter->harmonics) {
             harmonic = 0;
-            hop = 0;
+            if (rpmCode == RPM_CODE_EXPERIMENTAL) {
+                hop = 0;
+            }
             if (++filter == numberRpmNotchFilters) {
                 filter = 0;
                 if (++motor == getMotorCount()) {

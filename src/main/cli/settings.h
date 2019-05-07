@@ -136,6 +136,7 @@ typedef enum {
     TABLE_DTERM_FILTER_LOCATION,
 #ifdef USE_RPM_FILTER
     TABLE_RPM_LOWPASS_TYPE,
+    TABLE_RPM_CODE_TYPE,
 #endif
     LOOKUP_TABLE_COUNT
 } lookupTableIndex_e;

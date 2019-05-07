@@ -46,7 +46,14 @@ typedef struct rpmFilterConfig_s
     uint16_t rpm_dterm_lpf_max;
     uint8_t  rpm_gyro_lpf_type;
     uint8_t  rpm_dterm_lpf_type;
+    uint8_t  rpm_code;
 } rpmFilterConfig_t;
+
+enum {
+    RPM_CODE_CURRENT = 0,
+    RPM_CODE_EXPERIMENTAL
+};
+
 
 PG_DECLARE(rpmFilterConfig_t, rpmFilterConfig);
 
