@@ -193,7 +193,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     }
 
     dTermLPFMin = config->rpm_dterm_lpf_min;
-    dTermLPFMax = MIN (config->rpm_dterm_lpf_max, dtermFilter->maxHz);
+    dTermLPFMax = MIN (config->rpm_dterm_lpf_max, 0.48f / (pidLooptime * 1e-6f));
     if (dTermLPFMin >= dTermLPFMax ) {
         dTermLPFMin = 0;
     }
@@ -265,13 +265,13 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     FAST_RAM_ZERO_INIT static uint8_t harmonic;
     FAST_RAM_ZERO_INIT static uint8_t filter;
     FAST_RAM static rpmNotchFilter_t* currentFilter = &filters[0];
-    FAST_RAM_ZERO_INIT static float lowestFundamentalFreq;
+    float lowestFundamentalFreq;
 
     for (int motor = 0; motor < getMotorCount(); motor++) {
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
-        if (motor < 4) {
-            DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
-        }
+//        if (motor < 4) {
+//            DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
+//        }
 
         if ( motor == 0 ) {
             lowestFundamentalFreq = filteredMotorErpm[motor] * erpmToHz;
@@ -328,7 +328,10 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
             break;
         }
     }
-
+    DEBUG_SET(DEBUG_RPM_FILTER, 0, gyroLPFCutoff);
+    DEBUG_SET(DEBUG_RPM_FILTER, 1, dTermLPFCutoff);
+    DEBUG_SET(DEBUG_RPM_FILTER, 2, gyroLPFMin);
+    DEBUG_SET(DEBUG_RPM_FILTER, 3, dTermLPFMin);
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
         float frequency = constrainf(
             (harmonic + 1) * motorFrequency[motor], currentFilter->minHz, currentFilter->maxHz);
