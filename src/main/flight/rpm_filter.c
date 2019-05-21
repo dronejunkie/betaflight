@@ -71,7 +71,7 @@ typedef struct dtermLowpassWithCutOff_s {
 
 static FAST_RAM_ZERO_INIT pt1Filter_t rpmFilters[MAX_SUPPORTED_MOTORS];
 static FAST_RAM_ZERO_INIT gyroLowpassWithCutOff_t gyroLPFFilter[XYZ_AXIS_COUNT];
-static FAST_RAM_ZERO_INIT dtermLowpassWithCutOff_t dTermLPFFilter[XYZ_AXIS_COUNT];
+static FAST_RAM_ZERO_INIT dtermLowpassWithCutOff_t dtermLPFFilter[XYZ_AXIS_COUNT];
 static FAST_RAM_ZERO_INIT filterApplyFnPtr dTermLPFApplyFn;
 static FAST_RAM_ZERO_INIT filterApplyFnPtr gyroLPFApplyFn;
 
@@ -95,10 +95,10 @@ FAST_RAM_ZERO_INIT static rpmNotchFilter_t filters[2];
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* gyroFilter;
 FAST_RAM_ZERO_INIT static rpmNotchFilter_t* dtermFilter;
 FAST_RAM_ZERO_INIT static uint8_t gyroLPFType;
-FAST_RAM_ZERO_INIT static uint8_t dTermLPFType;
+FAST_RAM_ZERO_INIT static uint8_t dtermLPFType;
 FAST_RAM_ZERO_INIT static float dT;
-FAST_RAM_ZERO_INIT static float dTermLPFMin;
-FAST_RAM_ZERO_INIT static float dTermLPFMax;
+FAST_RAM_ZERO_INIT static float dtermLPFMin;
+FAST_RAM_ZERO_INIT static float dtermLPFMax;
 FAST_RAM_ZERO_INIT static float gyroLPFMin;
 FAST_RAM_ZERO_INIT static float gyroLPFMax;
 
@@ -173,7 +173,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     const float filtersPerLoopIteration = numberFilters / loopIterationsPerUpdate;
     filterUpdatesPerIteration = rintf(filtersPerLoopIteration + 0.49f);
     gyroLPFType = config->rpm_gyro_lpf_type;
-    dTermLPFType = config->rpm_dterm_lpf_type;
+    dtermLPFType = config->rpm_dterm_lpf_type;
     dT = gyro.targetLooptime * 1e-6f;
     gyroLPFMin = config->rpm_gyro_lpf_min;
     gyroLPFMax = MIN(config->rpm_gyro_lpf_max, gyroFilter->maxHz);
@@ -206,33 +206,33 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
 
     }
 
-    dTermLPFMin = config->rpm_dterm_lpf_min;
-    dTermLPFMax = MIN (config->rpm_dterm_lpf_max, 0.48f / (pidLooptime * 1e-6f));
-    if (dTermLPFMin >= dTermLPFMax ) {
-        dTermLPFMin = 0;
+    dtermLPFMin = config->rpm_dterm_lpf_min;
+    dtermLPFMax = MIN (config->rpm_dterm_lpf_max, 0.48f / (pidLooptime * 1e-6f));
+    if (dtermLPFMin >= dtermLPFMax ) {
+        dtermLPFMin = 0;
     }
 
-    if (dTermLPFMin > 0 ) {
-        switch (dTermLPFType){
+    if (dtermLPFMin > 0 ) {
+        switch (dtermLPFType){
         case FILTER_PT1:
             dTermLPFApplyFn = (filterApplyFnPtr) pt1FilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                dTermLPFFilter[axis].cutOff = dTermLPFMin;
-                pt1FilterInit(&dTermLPFFilter[axis].dtermLowpass.pt1Filter, pt1FilterGain(dTermLPFMin, pidLooptime * 1e-6f));
+                dtermLPFFilter[axis].cutOff = dtermLPFMin;
+                pt1FilterInit(&dtermLPFFilter[axis].dtermLowpass.pt1Filter, pt1FilterGain(dtermLPFMin, pidLooptime * 1e-6f));
             }
             break;
         case FILTER_BIQUAD:
             dTermLPFApplyFn = (filterApplyFnPtr) biquadFilterApplyDF1;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                dTermLPFFilter[axis].cutOff = dTermLPFMin;
-                biquadFilterInitLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFMin, pidLooptime);
+                dtermLPFFilter[axis].cutOff = dtermLPFMin;
+                biquadFilterInitLPF(&dtermLPFFilter[axis].dtermLowpass.biquadFilter, dtermLPFMin, pidLooptime);
             }
             break;
         default:
             dTermLPFApplyFn = (filterApplyFnPtr) biquadFilterApplyDF1;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                dTermLPFFilter[axis].cutOff = dTermLPFMin;
-                biquadFilterInitLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFMin, pidLooptime);
+                dtermLPFFilter[axis].cutOff = dtermLPFMin;
+                biquadFilterInitLPF(&dtermLPFFilter[axis].dtermLowpass.biquadFilter, dtermLPFMin, pidLooptime);
             }
             break;
         }
@@ -272,8 +272,8 @@ float rpmFilterGyro(int axis, float value)
 
 float rpmFilterDterm(int axis, float value)
 {
-    if (dTermLPFMin > 0) {
-        value = dTermLPFApplyFn((filter_t *) &dTermLPFFilter[axis],value);
+    if (dtermLPFMin > 0) {
+        value = dTermLPFApplyFn((filter_t *) &dtermLPFFilter[axis],value);
     }
 
     return applyFilter(dtermFilter, axis, value);
@@ -335,27 +335,27 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     }
 
     float dTermLPFCutoff;
-    if (dTermLPFMin > 0) {
+    if (dtermLPFMin > 0) {
         dTermLPFCutoff = lowestFundamentalFreq;
         dTermLPFCutoff -= MAX(dTermLPFCutoff / 10.0f, dTermLPFCutoff / currentFilter->q / 2.0f);
-        dTermLPFCutoff = constrainf(dTermLPFCutoff, dTermLPFMin, dTermLPFMax);
-        switch (dTermLPFType){
+        dTermLPFCutoff = constrainf(dTermLPFCutoff, dtermLPFMin, dtermLPFMax);
+        switch (dtermLPFType){
         case FILTER_PT1:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                dTermLPFFilter[axis].cutOff = dTermLPFCutoff;
-                pt1FilterUpdateCutoff(&dTermLPFFilter[axis].dtermLowpass.pt1Filter, pt1FilterGain(dTermLPFCutoff, pidLooptime * 1e-6f));
+                dtermLPFFilter[axis].cutOff = dTermLPFCutoff;
+                pt1FilterUpdateCutoff(&dtermLPFFilter[axis].dtermLowpass.pt1Filter, pt1FilterGain(dTermLPFCutoff, pidLooptime * 1e-6f));
             }
             break;
         case FILTER_BIQUAD:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                dTermLPFFilter[axis].cutOff = dTermLPFCutoff;
-                biquadFilterUpdateLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFCutoff, pidLooptime);
+                dtermLPFFilter[axis].cutOff = dTermLPFCutoff;
+                biquadFilterUpdateLPF(&dtermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFCutoff, pidLooptime);
             }
             break;
         default:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                dTermLPFFilter[axis].cutOff = dTermLPFCutoff;
-                biquadFilterUpdateLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFCutoff, pidLooptime);
+                dtermLPFFilter[axis].cutOff = dTermLPFCutoff;
+                biquadFilterUpdateLPF(&dtermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFCutoff, pidLooptime);
             }
             break;
         }
@@ -363,7 +363,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     DEBUG_SET(DEBUG_RPM_FILTER, 0, gyroLPFCutoff);
     DEBUG_SET(DEBUG_RPM_FILTER, 1, dTermLPFCutoff);
     DEBUG_SET(DEBUG_RPM_FILTER, 2, gyroLPFMin);
-    DEBUG_SET(DEBUG_RPM_FILTER, 3, dTermLPFMin);
+    DEBUG_SET(DEBUG_RPM_FILTER, 3, dtermLPFMin);
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
         float frequency = constrainf(
             (harmonic + 1) * motorFrequency[motor], currentFilter->minHz, currentFilter->maxHz);
