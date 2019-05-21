@@ -54,14 +54,24 @@ typedef union gyroLowpass_u {
     biquadFilter_t biquadFilter;
 } gyroLowpass_t;
 
+typedef struct gyroLowpassWithCutOff_s {
+    gyroLowpass_t gyroLowpass;
+    float cutOff;
+} gyroLowpassWithCutOff_t;
+
 typedef union dtermLowpass_u {
     pt1Filter_t pt1Filter;
     biquadFilter_t biquadFilter;
 } dtermLowpass_t;
 
+typedef struct dtermLowpassWithCutOff_s {
+    dtermLowpass_t dtermLowpass;
+    float cutOff;
+} dtermLowpassWithCutOff_t;
+
 static FAST_RAM_ZERO_INIT pt1Filter_t rpmFilters[MAX_SUPPORTED_MOTORS];
-static FAST_RAM_ZERO_INIT gyroLowpass_t gyroLPFFilter[XYZ_AXIS_COUNT];
-static FAST_RAM_ZERO_INIT dtermLowpass_t dTermLPFFilter[XYZ_AXIS_COUNT];
+static FAST_RAM_ZERO_INIT gyroLowpassWithCutOff_t gyroLPFFilter[XYZ_AXIS_COUNT];
+static FAST_RAM_ZERO_INIT dtermLowpassWithCutOff_t dTermLPFFilter[XYZ_AXIS_COUNT];
 static FAST_RAM_ZERO_INIT filterApplyFnPtr dTermLPFApplyFn;
 static FAST_RAM_ZERO_INIT filterApplyFnPtr gyroLPFApplyFn;
 
@@ -168,24 +178,28 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
     gyroLPFMin = config->rpm_gyro_lpf_min;
     gyroLPFMax = MIN(config->rpm_gyro_lpf_max, gyroFilter->maxHz);
     if (gyroLPFMin > 0 ) {
+
         switch (gyroLPFType){
         case FILTER_PT1:
             gyroLPFApplyFn = (filterApplyFnPtr) pt1FilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                pt1FilterInit(&gyroLPFFilter[axis].pt1Filter, pt1FilterGain(gyroLPFMin, dT));
+                gyroLPFFilter[axis].cutOff = gyroLPFMin;
+                pt1FilterInit(&gyroLPFFilter[axis].gyroLowpass.pt1Filter, pt1FilterGain(gyroLPFMin, dT));
             }
             break;
         case FILTER_BIQUAD:
             gyroLPFApplyFn = (filterApplyFnPtr) biquadFilterApplyDF1;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterInitLPF(&gyroLPFFilter[axis].biquadFilter, gyroLPFMin, gyro.targetLooptime);
+                gyroLPFFilter[axis].cutOff = gyroLPFMin;
+                biquadFilterInitLPF(&gyroLPFFilter[axis].gyroLowpass.biquadFilter, gyroLPFMin, gyro.targetLooptime);
             }
             break;
 
         default:
             gyroLPFApplyFn = (filterApplyFnPtr) pt1FilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                pt1FilterInit(&gyroLPFFilter[axis].pt1Filter, pt1FilterGain(gyroLPFMin, dT));
+                gyroLPFFilter[axis].cutOff = gyroLPFMin;
+                pt1FilterInit(&gyroLPFFilter[axis].gyroLowpass.pt1Filter, pt1FilterGain(gyroLPFMin, dT));
             }
             break;
         }
@@ -203,19 +217,22 @@ void rpmFilterInit(const rpmFilterConfig_t *config)
         case FILTER_PT1:
             dTermLPFApplyFn = (filterApplyFnPtr) pt1FilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                pt1FilterInit(&dTermLPFFilter[axis].pt1Filter, pt1FilterGain(dTermLPFMin, pidLooptime * 1e-6f));
+                dTermLPFFilter[axis].cutOff = dTermLPFMin;
+                pt1FilterInit(&dTermLPFFilter[axis].dtermLowpass.pt1Filter, pt1FilterGain(dTermLPFMin, pidLooptime * 1e-6f));
             }
             break;
         case FILTER_BIQUAD:
             dTermLPFApplyFn = (filterApplyFnPtr) biquadFilterApplyDF1;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterInitLPF(&dTermLPFFilter[axis].biquadFilter, dTermLPFMin, pidLooptime);
+                dTermLPFFilter[axis].cutOff = dTermLPFMin;
+                biquadFilterInitLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFMin, pidLooptime);
             }
             break;
         default:
             dTermLPFApplyFn = (filterApplyFnPtr) biquadFilterApplyDF1;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterInitLPF(&dTermLPFFilter[axis].biquadFilter, dTermLPFMin, pidLooptime);
+                dTermLPFFilter[axis].cutOff = dTermLPFMin;
+                biquadFilterInitLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFMin, pidLooptime);
             }
             break;
         }
@@ -237,11 +254,20 @@ static float applyFilter(rpmNotchFilter_t* filter, int axis, float value)
 
 float rpmFilterGyro(int axis, float value)
 {
+    float raw = value;
+    float afterLPF = 0;
     if (gyroLPFMin >  0) {
-        value = gyroLPFApplyFn((filter_t *) &gyroLPFFilter[axis],value);
+        value = gyroLPFApplyFn((filter_t *) &gyroLPFFilter[axis].gyroLowpass,value);
     }
-
-    return applyFilter(gyroFilter, axis, value);
+    afterLPF = value;
+    value = applyFilter(gyroFilter, axis, value);
+    if (axis == FD_ROLL) {
+        DEBUG_SET(DEBUG_RPM_DYN_LPF, 0, raw);
+        DEBUG_SET(DEBUG_RPM_DYN_LPF, 1, afterLPF);
+        DEBUG_SET(DEBUG_RPM_DYN_LPF, 2, value);
+        DEBUG_SET(DEBUG_RPM_DYN_LPF, 3, gyroLPFFilter[axis].cutOff);
+    }
+    return value;
 }
 
 float rpmFilterDterm(int axis, float value)
@@ -289,17 +315,20 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         switch (gyroLPFType){
         case FILTER_PT1:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                pt1FilterUpdateCutoff(&gyroLPFFilter[axis].pt1Filter, pt1FilterGain(gyroLPFCutoff, dT));
+                gyroLPFFilter[axis].cutOff = gyroLPFCutoff;
+                pt1FilterUpdateCutoff(&gyroLPFFilter[axis].gyroLowpass.pt1Filter, pt1FilterGain(gyroLPFCutoff, dT));
             }
             break;
         case FILTER_BIQUAD:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterUpdateLPF(&gyroLPFFilter[axis].biquadFilter, gyroLPFCutoff, gyro.targetLooptime);
+                gyroLPFFilter[axis].cutOff = gyroLPFCutoff;
+                biquadFilterUpdateLPF(&gyroLPFFilter[axis].gyroLowpass.biquadFilter, gyroLPFCutoff, gyro.targetLooptime);
             }
             break;
         default:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                pt1FilterUpdateCutoff(&gyroLPFFilter[axis].pt1Filter, pt1FilterGain(gyroLPFCutoff, dT));
+                gyroLPFFilter[axis].cutOff = gyroLPFCutoff;
+                pt1FilterUpdateCutoff(&gyroLPFFilter[axis].gyroLowpass.pt1Filter, pt1FilterGain(gyroLPFCutoff, dT));
             }
             break;
         }
@@ -313,17 +342,20 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         switch (dTermLPFType){
         case FILTER_PT1:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                pt1FilterUpdateCutoff(&dTermLPFFilter[axis].pt1Filter, pt1FilterGain(dTermLPFCutoff, pidLooptime * 1e-6f));
+                dTermLPFFilter[axis].cutOff = dTermLPFCutoff;
+                pt1FilterUpdateCutoff(&dTermLPFFilter[axis].dtermLowpass.pt1Filter, pt1FilterGain(dTermLPFCutoff, pidLooptime * 1e-6f));
             }
             break;
         case FILTER_BIQUAD:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterUpdateLPF(&dTermLPFFilter[axis].biquadFilter, dTermLPFCutoff, pidLooptime);
+                dTermLPFFilter[axis].cutOff = dTermLPFCutoff;
+                biquadFilterUpdateLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFCutoff, pidLooptime);
             }
             break;
         default:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterUpdateLPF(&dTermLPFFilter[axis].biquadFilter, dTermLPFCutoff, pidLooptime);
+                dTermLPFFilter[axis].cutOff = dTermLPFCutoff;
+                biquadFilterUpdateLPF(&dTermLPFFilter[axis].dtermLowpass.biquadFilter, dTermLPFCutoff, pidLooptime);
             }
             break;
         }
