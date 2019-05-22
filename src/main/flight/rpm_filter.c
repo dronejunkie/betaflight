@@ -259,6 +259,7 @@ float rpmFilterGyro(int axis, float value)
     if (gyroLPFMin >  0) {
         value = gyroLPFApplyFn((filter_t *) &gyroLPFFilter[axis].gyroLowpass,value);
     }
+
     afterLPF = value;
     value = applyFilter(gyroFilter, axis, value);
     if (axis == FD_ROLL) {
@@ -267,6 +268,7 @@ float rpmFilterGyro(int axis, float value)
         DEBUG_SET(DEBUG_RPM_DYN_LPF, 2, value);
         DEBUG_SET(DEBUG_RPM_DYN_LPF, 3, gyroLPFFilter[axis].cutOff);
     }
+
     return value;
 }
 
@@ -292,12 +294,11 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
     FAST_RAM_ZERO_INIT static uint8_t filter;
     FAST_RAM static rpmNotchFilter_t* currentFilter = &filters[0];
     float lowestFundamentalFreq;
-
     for (int motor = 0; motor < getMotorCount(); motor++) {
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
-//        if (motor < 4) {
-//            DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
-//        }
+        if (motor < 4) {
+            DEBUG_SET(DEBUG_RPM_FILTER, motor, motorFrequency[motor]);
+        }
 
         if ( motor == 0 ) {
             lowestFundamentalFreq = filteredMotorErpm[motor] * erpmToHz;
@@ -360,10 +361,7 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
             break;
         }
     }
-    DEBUG_SET(DEBUG_RPM_FILTER, 0, gyroLPFCutoff);
-    DEBUG_SET(DEBUG_RPM_FILTER, 1, dTermLPFCutoff);
-    DEBUG_SET(DEBUG_RPM_FILTER, 2, gyroLPFMin);
-    DEBUG_SET(DEBUG_RPM_FILTER, 3, dtermLPFMin);
+
     for (int i = 0; i < filterUpdatesPerIteration; i++) {
         float frequency = constrainf(
             (harmonic + 1) * motorFrequency[motor], currentFilter->minHz, currentFilter->maxHz);
