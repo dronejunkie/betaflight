@@ -1046,7 +1046,9 @@ const clivalue_t valueTable[] = {
 #ifdef USE_AIRMODE_LPF
     { "transient_throttle_limit",   VAR_UINT8 | MASTER_VALUE, .config.minmax = { 0, 30 }, PG_PID_PROFILE, offsetof(pidProfile_t, transient_throttle_limit) },
 #endif
-
+    { "ff_from_interpolated_sp",    VAR_UINT8 | PROFILE_VALUE | MODE_LOOKUP, .config.lookup = {TABLE_OFF_ON}, PG_PID_PROFILE, offsetof(pidProfile_t, ff_from_interpolated_sp) },
+    { "ff_max_rate",                VAR_UINT16| PROFILE_VALUE, .config.minmaxUnsigned = {0, 5000}, PG_PID_PROFILE, offsetof(pidProfile_t, ff_max_rate) },
+    { "ff_min_spread",                VAR_UINT8| PROFILE_VALUE, .config.minmaxUnsigned = {0, 50}, PG_PID_PROFILE, offsetof(pidProfile_t, ff_min_spread) },
 // PG_TELEMETRY_CONFIG
 #ifdef USE_TELEMETRY
     { "tlm_inverted",               VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_TELEMETRY_CONFIG, offsetof(telemetryConfig_t, telemetry_inverted) },
