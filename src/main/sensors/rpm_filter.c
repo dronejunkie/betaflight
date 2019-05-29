@@ -117,7 +117,7 @@ void pgResetFn_rpmFilterConfig(rpmFilterConfig_t *config)
     config->rpm_dterm_lpf_max = 0;
     config->rpm_gyro_lpf_type = FILTER_PT1;
     config->rpm_dterm_lpf_type = FILTER_BIQUAD;
-    config->rpm_code = RPM_CODE_EXPERIMENTAL;
+    config->rpm_code = RPM_CODE_CURRENT;
 }
 
 static void rpmNotchFilterInit(rpmNotchFilter_t* filter, int harmonics, int minHz, const float q[], float looptime)
