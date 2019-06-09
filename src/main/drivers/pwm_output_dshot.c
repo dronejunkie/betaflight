@@ -312,7 +312,7 @@ void pwmDshotMotorHardwareConfig(const timerHardware_t *timerHardware, uint8_t m
     motor->icInitStruct.TIM_ICPolarity = TIM_ICPolarity_BothEdge;
     motor->icInitStruct.TIM_ICPrescaler = TIM_ICPSC_DIV1;
     motor->icInitStruct.TIM_Channel = timerHardware->channel;
-    motor->icInitStruct.TIM_ICFilter = 0; //2;
+    motor->icInitStruct.TIM_ICFilter = 2; //2;
 #endif
 
     motor->timer = &dmaMotorTimers[timerIndex];
