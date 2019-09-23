@@ -304,18 +304,8 @@ FAST_CODE_NOINLINE void rpmFilterUpdate()
         return;
     }
 
-<<<<<<< Upstream, based on master
-=======
-    FAST_RAM_ZERO_INIT static uint8_t motor;
-    FAST_RAM_ZERO_INIT static uint8_t harmonic;
-    FAST_RAM_ZERO_INIT static uint8_t filter;
-    FAST_RAM static rpmNotchFilter_t* currentFilter = &filters[0];
     float lowestFundamentalFreq;
-<<<<<<< Upstream, based on master
 
->>>>>>> fa275ef merge low pass filter using bidirectional dshot tlm.
-=======
->>>>>>> c298ddd fixed debugging
     for (int motor = 0; motor < getMotorCount(); motor++) {
         filteredMotorErpm[motor] = pt1FilterApply(&rpmFilters[motor], getDshotTelemetry(motor));
         if (motor < 4) {
