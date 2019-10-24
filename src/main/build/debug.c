@@ -54,7 +54,9 @@ const char * const debugModeNames[DEBUG_COUNT] = {
     "RX_FRSKY_SPI",
     "RX_SFHSS_SPI",
     "GYRO_RAW",
+    "DUAL_GYRO",
     "DUAL_GYRO_RAW",
+    "DUAL_GYRO_COMBINE",
     "DUAL_GYRO_DIFF",
     "MAX7456_SIGNAL",
     "MAX7456_SPICLOCK",
@@ -94,4 +96,5 @@ const char * const debugModeNames[DEBUG_COUNT] = {
     "FF_LIMIT",
     "FF_INTERPOLATED",
     "BLACKBOX_OUTPUT",
+    "RPM_DYN_LPF",
 };
